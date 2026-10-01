@@ -1,0 +1,219 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<title>RAID Log</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Archivo:wdth,wght@75..100,500..800&family=Public+Sans:wght@400;500;600&family=JetBrains+Mono:wght@500&display=swap">
+<link rel="stylesheet" href="css/style.css">
+</head>
+<body>
+<div class="wrap">
+
+  <header class="masthead">
+    <div class="masthead-text">
+      <p class="eyebrow">RAID log · Risks, Assumptions, Issues, Dependencies</p>
+      <label class="sr-only" for="project-name">Project name</label>
+      <input id="project-name" class="project-name" value="Patient Portal Rollout" maxlength="80" spellcheck="false">
+      <p class="sync" id="sync-note">Loading entries…</p>
+    </div>
+    <div class="masthead-actions">
+      <button class="btn ghost" id="export-btn" type="button">Export CSV</button>
+      <button class="btn primary" id="new-btn" type="button">+ New entry</button>
+    </div>
+  </header>
+
+  <div class="example-banner" id="example-banner" hidden>
+    <span>Some entries below are examples so you can see how the log works.</span>
+    <button class="btn link" id="clear-examples" type="button">Remove examples</button>
+  </div>
+
+  <section class="summary" aria-label="Summary">
+    <div class="tiles" id="tiles"></div>
+    <figure class="heat">
+      <figcaption>
+        <span class="heat-title">Open risk exposure</span>
+        <span class="heat-hint">Likelihood × impact. Tap a cell to filter.</span>
+      </figcaption>
+      <div class="heat-body">
+        <span class="axis-y">Likelihood →</span>
+        <div class="heat-grid" id="heat-grid"></div>
+        <span class="axis-x">Impact →</span>
+      </div>
+    </figure>
+  </section>
+
+  <section class="log" aria-label="Log entries">
+    <div class="toolbar">
+      <div class="tabs" role="tablist" id="type-tabs">
+        <button role="tab" data-type="all" aria-selected="true">All</button>
+        <button role="tab" data-type="risk">Risks</button>
+        <button role="tab" data-type="assumption">Assumptions</button>
+        <button role="tab" data-type="issue">Issues</button>
+        <button role="tab" data-type="dependency">Dependencies</button>
+      </div>
+      <div class="filters">
+        <label class="sr-only" for="search">Search</label>
+        <input id="search" type="search" placeholder="Search title, owner, ref…">
+        <label class="sr-only" for="status-filter">Status</label>
+        <select id="status-filter">
+          <option value="active">Active (not closed)</option>
+          <option value="all">All statuses</option>
+          <option value="Open">Open</option>
+          <option value="In progress">In progress</option>
+          <option value="Monitoring">Monitoring</option>
+          <option value="Closed">Closed</option>
+          <option value="overdue">Overdue only</option>
+        </select>
+      </div>
+    </div>
+    <div class="cell-filter" id="cell-filter" hidden>
+      <span id="cell-filter-text"></span>
+      <button class="btn link" id="cell-filter-clear" type="button">Clear</button>
+    </div>
+
+    <div class="table-scroll">
+      <table class="raid-table">
+        <thead>
+          <tr>
+            <th data-sort="ref">Ref</th>
+            <th data-sort="title">Entry</th>
+            <th data-sort="owner">Owner</th>
+            <th data-sort="rating">Rating</th>
+            <th data-sort="status">Status</th>
+            <th data-sort="due">Due</th>
+          </tr>
+        </thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+    <div class="empty" id="empty" hidden>
+      <p class="empty-title" id="empty-title">Nothing matches these filters.</p>
+      <p id="empty-text">Try another tab or status, or add a new entry.</p>
+    </div>
+  </section>
+</div>
+
+<dialog id="editor" class="editor">
+  <form id="editor-form" method="dialog">
+    <header class="editor-head">
+      <div>
+        <p class="eyebrow" id="editor-ref">New entry</p>
+        <h2 id="editor-title">Add to the log</h2>
+      </div>
+      <button class="btn icon" type="button" id="editor-close" aria-label="Close">×</button>
+    </header>
+
+    <fieldset class="type-pick" id="type-pick">
+      <legend>Type</legend>
+      <label><input type="radio" name="type" value="risk" checked><span>Risk</span></label>
+      <label><input type="radio" name="type" value="assumption"><span>Assumption</span></label>
+      <label><input type="radio" name="type" value="issue"><span>Issue</span></label>
+      <label><input type="radio" name="type" value="dependency"><span>Dependency</span></label>
+    </fieldset>
+
+    <div class="field">
+      <label for="f-title">Title</label>
+      <input id="f-title" name="title" required maxlength="140" placeholder="Short, specific summary">
+    </div>
+    <div class="field">
+      <label for="f-desc">Description</label>
+      <textarea id="f-desc" name="description" rows="3" placeholder="What could happen, what we're assuming, what's broken, or what we're waiting on"></textarea>
+    </div>
+
+    <div class="grid-2">
+      <div class="field">
+        <label for="f-owner">Owner</label>
+        <input id="f-owner" name="owner" maxlength="60" placeholder="Name or role">
+      </div>
+      <div class="field">
+        <label for="f-status">Status</label>
+        <select id="f-status" name="status">
+          <option>Open</option>
+          <option>In progress</option>
+          <option>Monitoring</option>
+          <option>Closed</option>
+        </select>
+      </div>
+    </div>
+
+    <div class="grid-2" id="risk-scoring">
+      <div class="field">
+        <label for="f-likelihood">Likelihood (1–5)</label>
+        <select id="f-likelihood" name="likelihood">
+          <option value="1">1 · Rare</option>
+          <option value="2">2 · Unlikely</option>
+          <option value="3" selected>3 · Possible</option>
+          <option value="4">4 · Likely</option>
+          <option value="5">5 · Almost certain</option>
+        </select>
+      </div>
+      <div class="field">
+        <label for="f-impact">Impact (1–5)</label>
+        <select id="f-impact" name="impact">
+          <option value="1">1 · Negligible</option>
+          <option value="2">2 · Minor</option>
+          <option value="3" selected>3 · Moderate</option>
+          <option value="4">4 · Major</option>
+          <option value="5">5 · Severe</option>
+        </select>
+      </div>
+      <p class="score-line" id="score-line"></p>
+    </div>
+
+    <div class="grid-2" id="priority-row">
+      <div class="field">
+        <label for="f-priority">Priority</label>
+        <select id="f-priority" name="priority">
+          <option>High</option>
+          <option selected>Medium</option>
+          <option>Low</option>
+        </select>
+      </div>
+      <div class="field" id="depends-field">
+        <label for="f-depends">Depends on</label>
+        <input id="f-depends" name="dependsOn" maxlength="80" placeholder="Team, vendor or project">
+      </div>
+    </div>
+
+    <div class="field">
+      <label for="f-action" id="f-action-label">Mitigation</label>
+      <textarea id="f-action" name="action" rows="3"></textarea>
+    </div>
+
+    <div class="grid-2">
+      <div class="field">
+        <label for="f-raised">Date raised</label>
+        <input id="f-raised" name="raised" type="date">
+      </div>
+      <div class="field">
+        <label for="f-due">Due / review date</label>
+        <input id="f-due" name="due" type="date">
+      </div>
+    </div>
+
+    <footer class="editor-foot">
+      <div class="delete-zone" id="delete-zone">
+        <button class="btn danger-ghost" type="button" id="delete-btn">Delete</button>
+        <span class="confirm" id="delete-confirm" hidden>
+          Delete for good?
+          <button class="btn danger" type="button" id="delete-yes">Yes, delete</button>
+          <button class="btn link" type="button" id="delete-no">Keep it</button>
+        </span>
+      </div>
+      <p class="form-error" id="form-error" role="alert"></p>
+      <div class="foot-actions">
+        <button class="btn ghost" type="button" id="cancel-btn">Cancel</button>
+        <button class="btn primary" type="submit" id="save-btn">Save entry</button>
+      </div>
+    </footer>
+  </form>
+</dialog>
+
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+
+<script src="app.js"></script>
+</body>
+</html>
